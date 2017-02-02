@@ -3,6 +3,8 @@ package akka.http.services
 import akka.actor.{Props, ActorLogging, Actor, ActorSystem}
 import akka.http.scaladsl.Http
 import akka.http.services.Service3.{ResponseMessage, RequestMessage}
+import akka.http.services.security
+import akka.http.services.security.Authentication
 import akka.stream.ActorMaterializer
 
 import akka.http.scaladsl.model.{StatusCodes}
@@ -21,7 +23,7 @@ import scala.io.StdIn
  * Created by abelmeos on 2017/01/02.
  */
 
-object Service3 extends App with Directives{
+object Service3 extends App with Directives with Authentication{
 
   implicit val system = ActorSystem("my-system")
   implicit val materializer = ActorMaterializer()
@@ -37,17 +39,21 @@ object Service3 extends App with Directives{
   val pingPongActor = system.actorOf(Props[PingPongActor],"ping-pong-actor")
 
   val route:Route = path("ping-pong-service") {
-    post{
-      entity(as[RequestMessage]){
-        requestMessage => onSuccess(pingPongActor ? new RequestMessage("ping") ){
-          case response:ResponseMessage =>
-            complete(StatusCodes.OK, response)
+    authorize(hasPermission("123")){
+      post{
+        entity(as[RequestMessage]){
+          requestMessage => onSuccess(pingPongActor ? new RequestMessage("ping") ){
+            case response:ResponseMessage =>
+              complete(StatusCodes.OK, response)
 
-          case _ => complete(StatusCodes.InternalServerError)
+            case _ => complete(StatusCodes.InternalServerError)
+          }
+
         }
-
       }
+
     }
+
   }
 
   val bindingFuture = Http().bindAndHandle(route,"localhost",8080)
